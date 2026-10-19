@@ -1,0 +1,5 @@
+build/
+dist/
+third_party/
+__pycache__/
+*.log
