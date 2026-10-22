@@ -216,6 +216,10 @@ public:
     Run(const Defs& defs, const data::Program& program) : defs_(defs), program_(program) {}
 
     void set_seed(int32_t seed) { forced_seed_ = seed; }
+    // The clock the runtime seeds a frame's random numbers from when the frame has no fixed seed (Mt: h.Oc & 65535,
+    // h.Oc = Date.getTime()). The console sets its timer here before each frame start; it stays 0 (the same numbers
+    // every time) until something does, and set_seed overrides it (the parity checks).
+    void set_clock(uint32_t ms) { clock_ms_ = ms; }
     // Collision masks need the images' pixels: (image handle) -> RGBA8 crop of width x height, or false.
     using AlphaSource = std::function<bool(int32_t image, const uint8_t** rgba, int32_t* w, int32_t* h)>;
     void set_alpha_source(AlphaSource s) { alpha_ = std::move(s); }
@@ -277,6 +281,7 @@ private:
     const FrameDef* fd_ = nullptr;
     int32_t frame_ = -1;
     int32_t forced_seed_ = -1;
+    uint32_t clock_ms_ = 0;
     uint32_t frame_w_ = 0, frame_h_ = 0;
     int32_t oil_mismatches_ = 0;
 

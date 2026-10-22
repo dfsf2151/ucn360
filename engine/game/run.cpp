@@ -48,7 +48,7 @@ void Run::init_frame() { // Mt + Uu + iw
     for (Instance* i : slots_) delete i;
     slots_.assign(size_t(std::max(fd_->max_objects, 1)), nullptr);
     live_ = 0;
-    dw_ = forced_seed_ >= 0 ? forced_seed_ : (fd_->seed != -1 ? fd_->seed : 0);
+    dw_ = forced_seed_ >= 0 ? forced_seed_ : (fd_->seed != -1 ? fd_->seed : int32_t(clock_ms_ & 65535));
     tk_.assign(slots_.size() / 32 + 2, 0);
     nd_ = fd_->virtual_right == -1 ? 2147479552.0 : fd_->virtual_right;
     od_ = fd_->virtual_bottom == -1 ? 2147479552.0 : fd_->virtual_bottom;

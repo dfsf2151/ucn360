@@ -414,6 +414,7 @@ int main() {
         for (auto& group : file.second) group.second.erase("adjust");
     int32_t first = 0; // debug: a `start_frame` file beside the .xex holding a frame number starts there
     std::ifstream("start_frame") >> first;
+    run.set_clock(uint32_t(now_ms())); // each frame's random numbers start from the time, as the runtime's do
     run.start_frame(first >= 0 && first < int32_t(defs.frames.size()) ? first : 0);
 
     Pad pad;
@@ -429,8 +430,12 @@ int main() {
     int32_t tick = 0;
     uint32_t frames = 0;
     double spent[3] = {}; // ms in the ticks, laying the draws out, and handing them to the GPU (with the vsync wait)
-    int32_t dump_at = -1; // debug: a `dump_frame` file asks for one RGBA dump at the tick it holds (300 if empty)
-    if (std::ifstream d{"dump_frame"}) { dump_at = 300; d >> dump_at; }
+    // debug: a `dump_frame` file asks for RGBA dumps at the ticks it lists (300 if empty), frame_dump_TICK.rgba
+    std::vector<int32_t> dumps;
+    if (std::ifstream d{"dump_frame"}) {
+        for (int32_t t; d >> t;) dumps.push_back(t);
+        if (dumps.empty()) dumps.push_back(300);
+    }
     // debug: an `input_script` file replays game_host's --input ("T:down:x:y,T:up,T:move:x:y,T:key:code:1|0") at the
     // frame's own ticks, so a pad scenario can be checked in Xenia without a pad
     std::string script;
@@ -473,6 +478,7 @@ int main() {
                 int32_t next = run.next_frame(zb);
                 if (next < 0) next = 0;
                 xsdk_log_write("ucn360: frame %d -> %d", int(run.frame()), int(next));
+                run.set_clock(uint32_t(now_ms()));
                 run.start_frame(next);
                 tick = 0;
                 frame_start = now_ms();
@@ -498,13 +504,13 @@ int main() {
         spent[1] += t0 - t1;
         if (display) gpu.present(draws, background);
         spent[2] += now_ms() - t0;
-        if (dump_at >= 0 && tick >= dump_at) { // debug: a `dump_frame` file beside the .xex asks for one RGBA dump
+        if (!dumps.empty() && tick >= dumps.front()) { // debug: `dump_frame` beside the .xex
             std::vector<uint8_t> rgba;
             gpu.read_back(&rgba);
-            std::ofstream d("cache:\\frame_dump.rgba", std::ios::binary | std::ios::trunc); // Xenia: game: is read-only
-            d.write(reinterpret_cast<const char*>(rgba.data()), std::streamsize(rgba.size()));
-            xsdk_log_write("ucn360: dumped frame %d tick %d to frame_dump.rgba", int(run.frame()), int(tick));
-            dump_at = -1;
+            const std::string path = "cache:\\frame_dump_" + std::to_string(dumps.front()) + ".rgba"; // Xenia: game: is read-only
+            std::ofstream(path, std::ios::binary | std::ios::trunc).write(reinterpret_cast<const char*>(rgba.data()), std::streamsize(rgba.size()));
+            xsdk_log_write("ucn360: dumped frame %d tick %d to %s", int(run.frame()), int(tick), path.c_str());
+            dumps.erase(dumps.begin());
         }
         frames++;
         if (run.ini_dirty && now - last_save > 1000) { run.ini_dirty = false; save(run); last_save = now; }
